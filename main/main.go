@@ -27,7 +27,7 @@ type Config struct {
 
 var LocalMd5List = make(map[string]string)
 
-var Local_Md5_CACHE = "./Local_Md5_CACHE.json"
+//var LocalMd5Cache = "./Local_Md5_CACHE.json"
 
 var OSSMd5List = make([]string, 0)
 
@@ -92,7 +92,7 @@ func main() {
 
 		MakeConfigFile(new_userconfig)
 		fmt.Println("配置文件创建成功!五秒后将关闭程序")
-		getLocalDirFiles(new_userconfig.LocalDir, LocalMd5List)
+		// getLocalDirList(new_userconfig.LocalDir, LocalMd5List)
 		time.Sleep(5 * time.Second)
 
 	} else {
@@ -107,16 +107,40 @@ func main() {
 		fmt.Printf("HugoSiteDir = %v\n", userConfig.HugoSiteDir)
 		fmt.Println("........................................................")
 
-		//client := GetBucketClient(userConfig)
+		client := getBucketClient(userConfig)
 
-		hugoCommand(userConfig)
-		getLocalDirFiles(userConfig.LocalDir, LocalMd5List)
+		//生成新 Hugo 文件
+
+		//hugoCommand(userConfig)
+
+		//go getLocalDirList(userConfig.LocalDir, LocalMd5List)
+		OSSMd5List = getOSSMd5List(client, userConfig, OSSMd5List)
+		//
+		//获取 OSS 和 本地文件列表
+
+		//
+		//ossDelete(client, userConfig, "robots.txt")
+
+		//getOSSMd5List(client, userConfig, OSSMd5List)
+		//
+		//fmt.Println(OSSMd5List)
+		//time.Sleep(10 * time.Second)
+
+		//ossDelete(client, userConfig, "about/index.html")
+
+		//bucket, _ := client.Bucket(userConfig.BucketName)
+
+		//exist, _ := bucket.IsObjectExist("about/index.html")
+		//fmt.Println(exist)
+
+		//isAnagram(client, userConfig, OSSMd5List, LocalMd5List)
+		//pause()
 
 	}
 
 }
 
-func GetBucketClient(bucketConfig Config) *oss.Client {
+func getBucketClient(bucketConfig Config) *oss.Client {
 	client, err := oss.New(bucketConfig.Endpoint, bucketConfig.AccessKeyId, bucketConfig.AccessKeySecret)
 	if err != nil {
 		fmt.Printf(" oss.New err: %v", err)
@@ -125,8 +149,9 @@ func GetBucketClient(bucketConfig Config) *oss.Client {
 	return client
 }
 
-func GetOSSMd5List(ossClient *oss.Client, bucketConfig Config) {
-	bucket, err := ossClient.Bucket(bucketConfig.BucketName)
+func getOSSMd5List(ossClient *oss.Client, config Config, ossList []string) []string {
+	bucket, err := ossClient.Bucket(config.BucketName)
+
 	if err != nil {
 		fmt.Printf(" ossClient.Bucke err: %v", err)
 	}
@@ -139,34 +164,131 @@ func GetOSSMd5List(ossClient *oss.Client, bucketConfig Config) {
 	for _, object := range lsRes.Objects {
 		meta, _ := bucket.GetObjectMeta(object.Key)
 
-		OSSMd5List = append(OSSMd5List, strings.Trim(meta.Get("Etag"), "\""))
+		//OSSList[strings.Trim(meta.Get("Etag"), "\"")] = object.Key
+
+		fmt.Println(meta)
+		//
+		//fmt.Println(meta.Get("Etag"))
+
+		ossList = append(ossList, strings.Trim(meta.Get("Etag"), "\""))
 
 	}
 
+	return ossList
 }
 
-func getLocalDirFiles(path string, files map[string]string) {
+func getLocalDirList(path string, files map[string]string) {
 	dir, _ := os.ReadDir(path)
 
 	for _, fi := range dir {
 		if fi.IsDir() {
-			fullDir := path + "/" + fi.Name()
-			getLocalDirFiles(fullDir, files)
+			fullDir := path + fi.Name() + "/"
+			getLocalDirList(fullDir, files)
 		} else {
 			md5num, _ := getMd5(path + fi.Name())
 
 			files[md5num] = path + fi.Name()
 
-			json_files, _ := json.Marshal(files)
-
-			err := os.WriteFile(Local_Md5_CACHE, json_files, 0660)
-			if err != nil {
-				log.Fatal(err)
-			}
+			//jsonFiles, _ := json.Marshal(files)
+			//
+			//os.WriteFile(LocalMd5Cache, jsonFiles, 0644)
+			//
+			//return jsonFiles
 
 		}
 
 	}
+
+}
+
+// 比较两个MD5 list(map)的差异 并且上传文件
+func isAnagram(ossClient *oss.Client, config Config, OSS []string, Local map[string]string) {
+
+	//if len(OSS) < len(Local) {
+	//	fmt.Println("len(OSS) < len(Local) Begin OSS: ", len(OSS))
+	//	fmt.Println("len(OSS) < len(Local) Begin Local: ", len(Local))
+	//	//OSS 文件数小于 本地 本地上传到OSS
+	//	for ossItem, _ := range OSS {
+	//		_, ok := Local[OSS[ossItem]]
+	//		if ok {
+	//			// OSS 中存在相同MD5值的文件 ,跳过
+	//			delete(Local, OSS[ossItem])
+	//		}
+	//	}
+	//	fmt.Println("len(OSS) < len(Local) OSS: ", len(OSS))
+	//	fmt.Println("len(OSS) < len(Local) Local: ", len(Local))
+	//
+	//	//遍历上传
+	//	//fmt.Println("上传文件中....")
+	//	//for _, value := range Local {
+	//	//	//fmt.Println("strings.Trim(value, config.LocalDir): ", strings.TrimLeft(value, config.LocalDir))
+	//	//	//fmt.Println("value:", value)
+	//	//	//
+	//	//	index := strings.LastIndex(config.LocalDir, "/")
+	//	//	//fmt.Println(index)
+	//	//	//str := value[index:]
+	//	//	//fmt.Println("value[index:]: ", str)
+	//	//
+	//	//	//ossUpload(ossClient, config, strings.TrimLeft(value, config.LocalDir), value)
+	//	//	ossUpload(ossClient, config, value[index+1:], value)
+	//	//}
+	//
+	//}
+	fmt.Println("Begin OSS: ", len(OSS))
+	fmt.Println("Begin Local: ", len(Local))
+	// OSS 文件数等于本地 查询MD5 删除MD5不同的文件
+
+	for ossItem, _ := range OSS {
+		_, ok := Local[OSS[ossItem]]
+		//fmt.Println(ok)
+		if ok {
+			// OSS 中存在相同MD5值的文件 ,跳过
+			delete(Local, OSS[ossItem])
+		}
+	}
+
+	if len(Local) > 0 {
+
+		fmt.Println("len(OSS) == len(Local) OSS: ", len(OSS))
+		fmt.Println("len(OSS) == len(Local) Local: ", len(Local))
+
+		//遍历上传
+		//fmt.Println("上传文件中....")
+
+		for _, value := range Local {
+			//fmt.Println("strings.Trim(value, config.LocalDir): ", strings.TrimLeft(value, config.LocalDir))
+			//fmt.Println("value:", value)
+			//
+			index := strings.LastIndex(config.LocalDir, "/")
+			//fmt.Println(index)
+			//str := value[index:]
+			//fmt.Println("value[index:]: ", str)
+
+			//ossDelete(ossClient, config, value[index+1:])
+			ossUpload(ossClient, config, value[index+1:], value)
+		}
+
+	} else {
+		fmt.Println("OSS 中文件和本地文件相同无需上传")
+	}
+
+	//} else {
+	//	// OSS 文件数大于本地 以本地为准
+	//
+	//	for ossItem, _ := range OSS {
+	//		_, ok := Local[OSS[ossItem]]
+	//		//fmt.Println(ok)
+	//		if ok {
+	//			// OSS 中存在相同MD5值的文件 ,跳过
+	//			delete(Local, OSS[ossItem])
+	//		}
+	//	}
+	//
+	//}
+
+	//for key := range Local {
+	//
+	//}
 }
 
 // 计算MD5
@@ -183,35 +305,34 @@ func getMd5(filepath string) (string, error) {
 }
 
 // OSS 删除
-func ossDelete(client *oss.Client, bucketConfig Config, object string) {
-	bucket, err := client.Bucket(bucketConfig.BucketName)
+func ossDelete(client *oss.Client, config Config, object string) {
+	bucket, err := client.Bucket(config.BucketName)
 	if err != nil {
-		// HandleError(err)
+		fmt.Printf("client.Bucket ERROR: %v\n", err)
 	}
 
 	err = bucket.DeleteObject(object)
 	if err != nil {
-		// HandleError(err)
+		fmt.Printf("bucket.DeleteObject ERROR: %v\n", err)
 	}
+	fmt.Printf("文件 %v 已从 %v 中删除", object, config.BucketName)
 
 }
 
 // OSS上传
-func ossUpload() {
-	client, err := oss.New("Endpoint", "AccessKeyId", "AccessKeySecret")
+func ossUpload(client *oss.Client, config Config, fileName string, filePath string) {
+	bucket, err := client.Bucket(config.BucketName)
 	if err != nil {
-		// HandleError(err)
+		fmt.Printf("client.Bucket ERROR: %v\n", err)
 	}
 
-	bucket, err := client.Bucket("my-bucket")
+	err = bucket.PutObjectFromFile(fileName, filePath)
+	fmt.Printf("正在上传 %v , 本地路径: %v\n", fileName, filePath)
 	if err != nil {
-		// HandleError(err)
+		fmt.Printf("bucket.PutObjectFromFile ERROR: %v\n", err)
 	}
 
-	err = bucket.PutObjectFromFile("my-object", "LocalFile")
-	if err != nil {
-		// HandleError(err)
-	}
+	fmt.Printf("文件 %v 上传完毕\n", fileName)
 
 }
 
@@ -255,6 +376,7 @@ func MakeConfigFile(config Config) {
 	}
 }
 
+// hugo 命令
 func hugoCommand(config Config) {
 
 	//删除Public
@@ -278,5 +400,17 @@ func hugoCommand(config Config) {
 
 	fmt.Println(command.Stdout.(*bytes.Buffer).String())
 	fmt.Println("新文件生成完毕!!")
+
+}
+
+func pause() {
+
+	fmt.Println("--------------------------------------")
+
+	fmt.Printf("按任意键退出...")
+
+	b := make([]byte, 1)
+
+	os.Stdin.Read(b)
 
 }
