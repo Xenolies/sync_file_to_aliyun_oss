@@ -29,7 +29,7 @@ var LocalMd5List = make(map[string]string)
 
 //var LocalMd5Cache = "./Local_Md5_CACHE.json"
 
-var OSSMd5List = make([]string, 0)
+var OSSMd5List = make(map[string]string)
 
 var configPath string = "./config.json"
 
@@ -112,8 +112,8 @@ func main() {
 		//生成新 Hugo 文件
 		hugoCommand(userConfig)
 
-		getLocalDirList(userConfig.LocalDir, userConfig, LocalMd5List)
 		OSSMd5List = getOSSMd5List(client, userConfig, OSSMd5List)
+		getLocalDirList(userConfig.LocalDir, userConfig, LocalMd5List)
 
 		isAnagram(client, userConfig, OSSMd5List, LocalMd5List)
 		pause()
@@ -131,7 +131,7 @@ func getBucketClient(bucketConfig Config) *oss.Client {
 	return client
 }
 
-func getOSSMd5List(ossClient *oss.Client, config Config, ossList []string) []string {
+func getOSSMd5List(ossClient *oss.Client, config Config, ossList map[string]string) map[string]string {
 	bucket, err := ossClient.Bucket(config.BucketName)
 
 	if err != nil {
@@ -143,16 +143,32 @@ func getOSSMd5List(ossClient *oss.Client, config Config, ossList []string) []str
 		fmt.Printf(" bucket.ListObjects err: %v", err)
 	}
 
+	//lsResChild, err := bucket.ListObjects(oss.MaxKeys(1000), oss.Delimiter("/"))
+	//if err != nil {
+	//	fmt.Printf(" bucket.ListObjects err: %v", err)
+	//}
+
+	//获取子目录Objects
+	//for _, objectChild := range lsResChild.Objects {
+	//	meta, _ := bucket.GetObjectMeta(objectChild.Key)
+	//
+	//	objMD5 := strings.Trim(meta.Get("Etag"), "\"")
+	//	ossChildList[objMD5] = objectChild.Key
+	//	//ossChildList = append(ossChildList, strings.Trim(meta.Get("Etag"), "\""))
+	//}
+
 	for _, object := range lsRes.Objects {
 		meta, _ := bucket.GetObjectMeta(object.Key)
 
+		objMD5 := strings.Trim(meta.Get("Etag"), "\"")
+
+		ossList[object.Key] = objMD5
+
 		//OSSList[strings.Trim(meta.Get("Etag"), "\"")] = object.Key
 
-		//fmt.Println(meta)
-		//
 		//fmt.Println(meta.Get("Etag"))
 
-		ossList = append(ossList, strings.Trim(meta.Get("Etag"), "\""))
+		//ossList = append(ossList, strings.Trim(meta.Get("Etag"), "\""))
 
 	}
 
@@ -171,7 +187,7 @@ func getLocalDirList(path string, config Config, files map[string]string) {
 
 			md5num, _ := getMd5(path + fi.Name())
 
-			files[md5num] = path + fi.Name()
+			files[path+fi.Name()] = md5num
 
 			//jsonFiles, _ := json.Marshal(files)
 			//
@@ -186,25 +202,49 @@ func getLocalDirList(path string, config Config, files map[string]string) {
 }
 
 // 比较两个MD5 list(map)的差异 并且上传文件
-func isAnagram(ossClient *oss.Client, config Config, OSS []string, Local map[string]string) {
+func isAnagram(ossClient *oss.Client, config Config, OSS map[string]string, Local map[string]string) {
 
-	for ossItem, _ := range OSS {
-		_, ok := Local[OSS[ossItem]]
-		if ok {
-			// OSS 中存在相同MD5值的文件 ,跳过
-			delete(Local, OSS[ossItem])
+	//fmt.Println("OSS:  ", OSS)
+
+	for localItem, _ := range Local {
+		index := strings.LastIndex(config.LocalDir, "/")
+
+		if OSS[(localItem[index+1:])] == Local[localItem] {
+			delete(Local, localItem)
+			delete(OSS, (localItem[index+1:]))
 		}
 	}
 
-	index := strings.LastIndex(config.LocalDir, "/")
+	var UpTime int
+	var DeleteTime int
+	if len(OSS) > 0 && len(Local) == 0 {
 
-	var times int
-	for _, value := range Local {
-		ossUpload(ossClient, config, value[index+1:], value)
-		times++
+		for key, _ := range OSS {
+			fmt.Println("需要删除: ", key)
+			ossDelete(ossClient, config, key)
+			DeleteTime++
+		}
+		fmt.Printf("删除了 %v 个文件\n", DeleteTime)
+
+	} else if len(OSS) > 0 && len(Local) > 0 {
+
+		for key, _ := range OSS {
+			fmt.Println("需要删除: ", key)
+			ossDelete(ossClient, config, key)
+			DeleteTime++
+		}
+
+		index := strings.LastIndex(config.LocalDir, "/")
+		for localItem, _ := range Local {
+			ossUpload(ossClient, config, localItem[index+1:], localItem)
+			fmt.Println("需要上传: ", localItem)
+			UpTime++
+		}
+		fmt.Printf("上传了 %v 个文件\n", UpTime)
+		fmt.Printf("删除了 %v 个文件\n", DeleteTime)
+
 	}
 
-	fmt.Printf("上传了 %v 个文件\n", times)
 }
 
 // 计算MD5
@@ -231,7 +271,7 @@ func ossDelete(client *oss.Client, config Config, object string) {
 	if err != nil {
 		fmt.Printf("bucket.DeleteObject ERROR: %v\n", err)
 	}
-	fmt.Printf("文件 %v 已从 %v 中删除", object, config.BucketName)
+	fmt.Printf("文件 %v 已从 %v 中删除\n", object, config.BucketName)
 
 }
 
