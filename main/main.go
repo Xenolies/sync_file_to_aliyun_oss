@@ -110,31 +110,13 @@ func main() {
 		client := getBucketClient(userConfig)
 
 		//生成新 Hugo 文件
+		hugoCommand(userConfig)
 
-		//hugoCommand(userConfig)
-
-		//go getLocalDirList(userConfig.LocalDir, LocalMd5List)
+		getLocalDirList(userConfig.LocalDir, userConfig, LocalMd5List)
 		OSSMd5List = getOSSMd5List(client, userConfig, OSSMd5List)
-		//
-		//获取 OSS 和 本地文件列表
 
-		//
-		//ossDelete(client, userConfig, "robots.txt")
-
-		//getOSSMd5List(client, userConfig, OSSMd5List)
-		//
-		//fmt.Println(OSSMd5List)
-		//time.Sleep(10 * time.Second)
-
-		//ossDelete(client, userConfig, "about/index.html")
-
-		//bucket, _ := client.Bucket(userConfig.BucketName)
-
-		//exist, _ := bucket.IsObjectExist("about/index.html")
-		//fmt.Println(exist)
-
-		//isAnagram(client, userConfig, OSSMd5List, LocalMd5List)
-		//pause()
+		isAnagram(client, userConfig, OSSMd5List, LocalMd5List)
+		pause()
 
 	}
 
@@ -166,7 +148,7 @@ func getOSSMd5List(ossClient *oss.Client, config Config, ossList []string) []str
 
 		//OSSList[strings.Trim(meta.Get("Etag"), "\"")] = object.Key
 
-		fmt.Println(meta)
+		//fmt.Println(meta)
 		//
 		//fmt.Println(meta.Get("Etag"))
 
@@ -177,14 +159,16 @@ func getOSSMd5List(ossClient *oss.Client, config Config, ossList []string) []str
 	return ossList
 }
 
-func getLocalDirList(path string, files map[string]string) {
+func getLocalDirList(path string, config Config, files map[string]string) {
+
 	dir, _ := os.ReadDir(path)
 
 	for _, fi := range dir {
 		if fi.IsDir() {
 			fullDir := path + fi.Name() + "/"
-			getLocalDirList(fullDir, files)
+			getLocalDirList(fullDir, config, files)
 		} else {
+
 			md5num, _ := getMd5(path + fi.Name())
 
 			files[md5num] = path + fi.Name()
@@ -204,91 +188,23 @@ func getLocalDirList(path string, files map[string]string) {
 // 比较两个MD5 list(map)的差异 并且上传文件
 func isAnagram(ossClient *oss.Client, config Config, OSS []string, Local map[string]string) {
 
-	//if len(OSS) < len(Local) {
-	//	fmt.Println("len(OSS) < len(Local) Begin OSS: ", len(OSS))
-	//	fmt.Println("len(OSS) < len(Local) Begin Local: ", len(Local))
-	//	//OSS 文件数小于 本地 本地上传到OSS
-	//	for ossItem, _ := range OSS {
-	//		_, ok := Local[OSS[ossItem]]
-	//		if ok {
-	//			// OSS 中存在相同MD5值的文件 ,跳过
-	//			delete(Local, OSS[ossItem])
-	//		}
-	//	}
-	//	fmt.Println("len(OSS) < len(Local) OSS: ", len(OSS))
-	//	fmt.Println("len(OSS) < len(Local) Local: ", len(Local))
-	//
-	//	//遍历上传
-	//	//fmt.Println("上传文件中....")
-	//	//for _, value := range Local {
-	//	//	//fmt.Println("strings.Trim(value, config.LocalDir): ", strings.TrimLeft(value, config.LocalDir))
-	//	//	//fmt.Println("value:", value)
-	//	//	//
-	//	//	index := strings.LastIndex(config.LocalDir, "/")
-	//	//	//fmt.Println(index)
-	//	//	//str := value[index:]
-	//	//	//fmt.Println("value[index:]: ", str)
-	//	//
-	//	//	//ossUpload(ossClient, config, strings.TrimLeft(value, config.LocalDir), value)
-	//	//	ossUpload(ossClient, config, value[index+1:], value)
-	//	//}
-	//
-	//}
-	fmt.Println("Begin OSS: ", len(OSS))
-	fmt.Println("Begin Local: ", len(Local))
-	// OSS 文件数等于本地 查询MD5 删除MD5不同的文件
-
 	for ossItem, _ := range OSS {
 		_, ok := Local[OSS[ossItem]]
-		//fmt.Println(ok)
 		if ok {
 			// OSS 中存在相同MD5值的文件 ,跳过
 			delete(Local, OSS[ossItem])
 		}
 	}
 
-	if len(Local) > 0 {
+	index := strings.LastIndex(config.LocalDir, "/")
 
-		fmt.Println("len(OSS) == len(Local) OSS: ", len(OSS))
-		fmt.Println("len(OSS) == len(Local) Local: ", len(Local))
-
-		//遍历上传
-		//fmt.Println("上传文件中....")
-
-		for _, value := range Local {
-			//fmt.Println("strings.Trim(value, config.LocalDir): ", strings.TrimLeft(value, config.LocalDir))
-			//fmt.Println("value:", value)
-			//
-			index := strings.LastIndex(config.LocalDir, "/")
-			//fmt.Println(index)
-			//str := value[index:]
-			//fmt.Println("value[index:]: ", str)
-
-			//ossDelete(ossClient, config, value[index+1:])
-			ossUpload(ossClient, config, value[index+1:], value)
-		}
-
-	} else {
-		fmt.Println("OSS 中文件和本地文件相同无需上传")
+	var times int
+	for _, value := range Local {
+		ossUpload(ossClient, config, value[index+1:], value)
+		times++
 	}
 
-	//} else {
-	//	// OSS 文件数大于本地 以本地为准
-	//
-	//	for ossItem, _ := range OSS {
-	//		_, ok := Local[OSS[ossItem]]
-	//		//fmt.Println(ok)
-	//		if ok {
-	//			// OSS 中存在相同MD5值的文件 ,跳过
-	//			delete(Local, OSS[ossItem])
-	//		}
-	//	}
-	//
-	//}
-
-	//for key := range Local {
-	//
-	//}
+	fmt.Printf("上传了 %v 个文件\n", times)
 }
 
 // 计算MD5
