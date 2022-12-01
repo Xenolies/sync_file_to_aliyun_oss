@@ -143,32 +143,12 @@ func getOSSMd5List(ossClient *oss.Client, config Config, ossList map[string]stri
 		fmt.Printf(" bucket.ListObjects err: %v", err)
 	}
 
-	//lsResChild, err := bucket.ListObjects(oss.MaxKeys(1000), oss.Delimiter("/"))
-	//if err != nil {
-	//	fmt.Printf(" bucket.ListObjects err: %v", err)
-	//}
-
-	//获取子目录Objects
-	//for _, objectChild := range lsResChild.Objects {
-	//	meta, _ := bucket.GetObjectMeta(objectChild.Key)
-	//
-	//	objMD5 := strings.Trim(meta.Get("Etag"), "\"")
-	//	ossChildList[objMD5] = objectChild.Key
-	//	//ossChildList = append(ossChildList, strings.Trim(meta.Get("Etag"), "\""))
-	//}
-
 	for _, object := range lsRes.Objects {
 		meta, _ := bucket.GetObjectMeta(object.Key)
 
 		objMD5 := strings.Trim(meta.Get("Etag"), "\"")
 
 		ossList[object.Key] = objMD5
-
-		//OSSList[strings.Trim(meta.Get("Etag"), "\"")] = object.Key
-
-		//fmt.Println(meta.Get("Etag"))
-
-		//ossList = append(ossList, strings.Trim(meta.Get("Etag"), "\""))
 
 	}
 
@@ -243,6 +223,9 @@ func isAnagram(ossClient *oss.Client, config Config, OSS map[string]string, Loca
 		fmt.Printf("上传了 %v 个文件\n", UpTime)
 		fmt.Printf("删除了 %v 个文件\n", DeleteTime)
 
+	} else {
+		fmt.Printf("上传了 %v 个文件\n", UpTime)
+		fmt.Printf("删除了 %v 个文件\n", DeleteTime)
 	}
 
 }
