@@ -1,4 +1,4 @@
-# sync_file_to_aliyun_oss 阿里云OSS快捷同步
+# 阿里云OSS快捷同步
 
 折腾Hugo博客的时候发现Hugo博客的上传没有Hexo那样方便.
 找了下阿里云OSS的API文档,发现有Go语言版本的,所以就整了个出来.
